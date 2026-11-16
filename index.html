@@ -89,24 +89,35 @@ ol.steps li::marker{font-weight:700;color:var(--acc)}
 "use strict";
 var CATS=[["hotel","Hotel"],["restaurant","Restaurant"],["cafe","Café und Bäckerei"],["bar","Bar und Pub"],["rooftop","Rooftop-Bar"],["nacht","Gogo und Club"],["massage","Massage und Spa"],["laundry","Wäscherei"],["geld","Geld und Wechselstube"],["shop","Einkaufen"],["gesund","Klinik und Apotheke"],["schneider","Schneider"],["sonst","Sonstiges"]];
 var CN={};CATS.forEach(function(c){CN[c[0]]=c[1];});
-var ORTE=[["bkk","Bangkok"],["pty","Pattaya"],["and","Andere Orte"]];
-var ON={bkk:"Bangkok",pty:"Pattaya",and:"Andere Orte"};
+var CITY0=[{k:"bkk",n:"Bangkok",pre:["0x30e2"]},{k:"pty",n:"Pattaya",pre:["0x3102"]},{k:"patong",n:"Patong (Phuket)",pre:["0x3050"]},{k:"dubai",n:"Dubai",pre:["0x3e5f"]},{k:"newyork",n:"New York",pre:["0x89c2"]},{k:"jakarta",n:"Jakarta",pre:["0x2e69"]},{k:"bergheim",n:"Bergheim",pre:["0x47bf"]}];
+var ORTE=[];
 var KEY="meine-orte-daten",VKEY="meine-orte-ansicht";
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
 
 /* ---------- Speicher ---------- */
 var data={places:[],edits:{}};
-try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.places){data={places:d.places,edits:d.edits||{}};}}}catch(e){}
+try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.places){data={places:d.places,edits:d.edits||{},cities:d.cities};}}}catch(e){}
+if(!data.cities){data.cities=JSON.parse(JSON.stringify(CITY0));}
+function prefixOf(u){var m=/1s(0x[0-9a-f]+):/.exec(u||"");return m?m[1].slice(0,6):"";}
+function cityByKey(k){for(var i=0;i<data.cities.length;i++){if(data.cities[i].k===k){return data.cities[i];}}return null;}
+function cityName(k){var c=cityByKey(k);return c?c.n:"Andere Orte";}
+function ortOfUrl(u){var p=prefixOf(u);if(!p){return "and";}for(var i=0;i<data.cities.length;i++){if(data.cities[i].pre.indexOf(p)>=0){return data.cities[i].k;}}return "and";}
+function ortOfAddr(a){for(var i=0;i<data.cities.length;i++){if(a&&a.toLowerCase().indexOf(data.cities[i].n.toLowerCase().split(" (")[0])>=0){return data.cities[i].k;}}return /Chon ?Buri|Bang Lamung/i.test(a||"")?"pty":"and";}
+function orteList(){var l=data.cities.slice(2).sort(function(a,b){return a.n.localeCompare(b.n,"de");});return [data.cities[0],data.cities[1]].concat(l).map(function(c){return [c.k,c.n];}).concat([["and","Andere Orte"]]);}
+function learn(p,k){var pre=prefixOf(p.u);if(!pre||k==="and"||ortOfUrl(p.u)!=="and"){return;}var c=cityByKey(k);if(c){c.pre.push(pre);}}
+/* Orte unter "Andere Orte" einer bekannten Stadt zuordnen */
+data.places.forEach(function(p){if(p.o==="and"){var o=/^cid/.test(p.id)?ortOfAddr(p.a):ortOfUrl(p.u);if(o!=="and"){p.o=o;}}});
 var storeOk=true;
-function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));storeOk=true;}catch(e){storeOk=false;}}
+ORTE=orteList();
+function persist(){ORTE=orteList();try{localStorage.setItem(KEY,JSON.stringify(data));storeOk=true;}catch(e){storeOk=false;}}
 try{if(navigator.storage&&navigator.storage.persist){navigator.storage.persist();}}catch(e){}
 
 var view={tab:"orte",q:"",ort:"alle",flt:"alle",edit:null,open:{}};
 try{var v=JSON.parse(localStorage.getItem(VKEY)||"null");if(v){view.tab=v.tab||"orte";view.ort=v.ort||"alle";view.flt=v.flt||"alle";view.open=v.open||{};}}catch(e){}
 if(location.hash==="#anleitung"){view.tab="anleitung";}
 function saveView(){try{localStorage.setItem(VKEY,JSON.stringify({tab:view.tab,ort:view.ort,flt:view.flt,open:view.open}));}catch(e){}}
-var msg="",pending=null,askDel=null,askAll=false;
+var msg="",pending=null,askDel=null,askAll=false,newCity=false;
 
 /* ---------- Ortslogik ---------- */
 function E(p){return data.edits[p.id]||{};}
@@ -118,6 +129,7 @@ function setE(p,k,val){var e=data.edits[p.id]||{};
  if(Object.keys(e).length){data.edits[p.id]=e;}else{delete data.edits[p.id];}
  persist();}
 function srcOf(p){return /^cid/.test(p.id)?"stern":"liste";}
+function setCity(p,k){setE(p,"o",k===p.o?"":k);learn(p,k);persist();view.open[k+"|"+cat(p)]=1;}
 function removePlaces(ids){var set={};ids.forEach(function(i){set[i]=1;delete data.edits[i];});data.places=data.places.filter(function(p){return !set[p.id];});if(set[view.edit]){view.edit=null;}persist();}
 function byId(id){for(var i=0;i<data.places.length;i++){if(data.places[i].id===id){return data.places[i];}}return null;}
 function match(p){
@@ -139,7 +151,8 @@ function card(p){
  h+='</div><div class="acts"><a class="btn p" href="'+esc(p.u)+'" target="_blank" rel="noopener">In Maps öffnen</a><button type="button" class="btn s" data-act="edit">'+(view.edit===p.id?"Schließen":"Bearbeiten")+"</button></div>";
  if(view.edit===p.id){
   h+='<div class="ed"><label>Kategorie<select id="ed-cat">'+CATS.map(function(c){return '<option value="'+c[0]+'"'+(cat(p)===c[0]?" selected":"")+">"+esc(c[1])+"</option>";}).join("")+"</select></label>";
-  h+='<label>Stadt<select id="ed-ort">'+ORTE.map(function(o){return '<option value="'+o[0]+'"'+((e.o||p.o)===o[0]?" selected":"")+">"+o[1]+"</option>";}).join("")+"</select></label>";
+  h+='<label>Stadt<select id="ed-ort">'+ORTE.map(function(o){return '<option value="'+o[0]+'"'+(ortOfP(p)===o[0]&&!newCity?" selected":"")+">"+esc(o[1])+"</option>";}).join("")+'<option value="+neu"'+(newCity?" selected":"")+">Neue Stadt …</option></select></label>";
+  if(newCity){h+='<div class="row2"><input type="text" id="ed-city" placeholder="Name der Stadt" autocomplete="off"><button type="button" class="btn p" style="flex:none" data-act="city-add">Anlegen</button></div>';}
   if(unsure(p)){h+='<button type="button" class="btn s" data-act="ok">Kategorie passt</button>';}
   h+='<label class="ck"><input type="checkbox" id="ed-v"'+(e.v?" checked":"")+">War ich schon</label>";
   h+='<label>Bewertung<select id="ed-r">'+[0,1,2,3,4,5].map(function(n){return '<option value="'+n+'"'+((e.r||0)===n?" selected":"")+">"+(n?n+" von 5 Sternen":"keine")+"</option>";}).join("")+"</select></label>";
@@ -157,7 +170,7 @@ function renderOrte(){
  var auto=!!view.q||view.flt!=="alle";
  var h='<header><h1>Meine Orte</h1><p class="sub">'+all.length+" Orte gespeichert, "+shown.length+" angezeigt</p></header>";
  h+='<div class="top"><div class="row2"><input type="search" id="q" placeholder="Suchen" value="'+esc(view.q)+'"><select id="flt" aria-label="Filter">'+[["alle","Alle"],["neu","Noch nicht besucht"],["war","War ich schon"],["top","4 und 5 Sterne"],["pruef","Kategorie prüfen"]].map(function(f){return '<option value="'+f[0]+'"'+(view.flt===f[0]?" selected":"")+">"+f[1]+"</option>";}).join("")+"</select></div>";
- h+='<div class="seg">'+[["alle","Alle"]].concat(ORTE).filter(function(o){return o[0]==="alle"||oc[o[0]];}).map(function(o){return '<button type="button" class="chip" data-ort="'+o[0]+'" aria-pressed="'+(view.ort===o[0])+'">'+(o[0]==="and"?"Andere":o[1])+"<b>"+(oc[o[0]]||0)+"</b></button>";}).join("")+"</div></div>";
+ h+='<div class="seg">'+[["alle","Alle"]].concat(ORTE).filter(function(o){return o[0]==="alle"||oc[o[0]];}).map(function(o){return '<button type="button" class="chip" data-ort="'+o[0]+'" aria-pressed="'+(view.ort===o[0])+'">'+(o[0]==="and"?"Andere":o[1].split(" (")[0])+"<b>"+(oc[o[0]]||0)+"</b></button>";}).join("")+"</div></div>";
  if(msg){h+='<div class="msg">'+esc(msg)+"</div>";}
  if(!shown.length){h+='<p class="empty">Kein Ort passt zu dieser Auswahl.</p>';}
  ORTE.forEach(function(o){
@@ -179,7 +192,7 @@ function renderAnl(){
   var many=pending.length>data.places.length/2;
   h+='<section class="ask"><h2 style="margin:0;font:700 19px var(--f-d)">'+pending.length+(pending.length===1?" Ort steht":" Orte stehen")+' nicht mehr in der Datei</h2><p>Diese Orte hast du vermutlich in Google Maps gelöscht. Sollen sie auch aus der App verschwinden? Notizen und Bewertungen gehen dabei mit.</p>'+
   (many?'<p><strong>Das ist mehr als die Hälfte deiner Orte. Bitte prüfen, ob die richtige Datei gewählt war.</strong></p>':'')+
-  "<ul>"+pending.map(function(id){var p=byId(id);return p?"<li>"+esc(p.n)+" <span class=\"meta\">("+esc(ON[ortOfP(p)])+")</span></li>":"";}).join("")+"</ul>"+
+  "<ul>"+pending.map(function(id){var p=byId(id);return p?"<li>"+esc(p.n)+" <span class=\"meta\">("+esc(cityName(ortOfP(p)))+")</span></li>":"";}).join("")+"</ul>"+
   '<div class="acts"><button type="button" class="btn dp" data-act="pend-del">'+(pending.length===1?"Diesen Ort löschen":"Diese "+pending.length+" Orte löschen")+'</button><button type="button" class="btn s" data-act="pend-keep">Behalten</button></div></section>';}
  h+='<section class="box"><h2>1. Datei bei Google holen</h2><ol class="steps">'+
  '<li>In Google Maps neue Orte wie gewohnt in der Liste „Favoriten“ speichern.</li>'+
@@ -220,7 +233,6 @@ function render(focusQ){
 /* ---------- Import ---------- */
 var GUESS=[["schneider",/tailor|clothier|schneider/],["laundry",/laundry|wäscherei/],["geld",/exchange|\bbank\b|atm|money|wechsel/],["gesund",/clinic|klinik|hospital|pharmac|apotheke|dental|boots/],["massage",/massage|\bspa\b|nuru|soap/],["rooftop",/rooftop|sky ?bar/],["hotel",/hotel|resort|residence|lodge|guest ?house|hostel|\binn\b|condo/],["nacht",/a ?go ?go|club|gentlemen/],["cafe",/caf[eé]|coffee|bakery|pastry|bäckerei|กาแฟ/],["restaurant",/restaurant|pizz|burger|steak|grill|bistro|kitchen|food|trattoria|ristorante|bbq|thai food/],["bar",/\bbar\b|\bpub\b|beer|lounge|biergarten|kneipe/],["shop",/mall|market|shop|7-eleven|big c|plaza|center|centre|central/]];
 function guess(n){n=n.toLowerCase();for(var i=0;i<GUESS.length;i++){if(GUESS[i][1].test(n)){return GUESS[i][0];}}return "sonst";}
-function ortOfUrl(u){var m=/1s(0x[0-9a-f]+):/.exec(u),p=m?m[1].slice(0,6):"";return p==="0x30e2"?"bkk":p==="0x3102"?"pty":"and";}
 function parseCSV(t){var rows=[],row=[],f="",q=false,i=0,c;t=t.replace(/^\uFEFF/,"");
  for(;i<t.length;i++){c=t[i];
   if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++;}else{q=false;}}else{f+=c;}}
@@ -239,7 +251,7 @@ function fromCSV(t){var rows=parseCSV(t),out=[];if(!rows.length){return out;}
  return out;}
 function fromGeo(j){var out=[];(j.features||[]).forEach(function(f){var pr=f.properties||{},loc=pr.location||{},u=String(pr.google_maps_url||"").replace(/^http:/,"https:"),n=(loc.name||pr.Title||"").trim();
   if(!n||!u){return;}var m=/cid=(\d+)/.exec(u),a=loc.address||"";
-  out.push({id:m?"cid"+m[1]:"u:"+u,n:n,u:u,c:guess(n),o:/Bangkok/i.test(a)?"bkk":/Pattaya|Chon ?Buri|Bang Lamung/i.test(a)?"pty":"and",g:"",q:1,a:a,star:1});});
+  out.push({id:m?"cid"+m[1]:"u:"+u,n:n,u:u,c:guess(n),o:ortOfAddr(a),g:"",q:1,a:a,star:1});});
  return out;}
 /* ZIP lesen ohne Zusatzbibliothek */
 function inflate(bytes){return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();}
@@ -279,6 +291,7 @@ function importFile(f){
   var ids={},names={},neu=0,da=0,ed=0;
   data.places.forEach(function(p){ids[p.id]=1;names[p.n.toLowerCase()]=1;});
   backups.forEach(function(b){(b.places||[]).forEach(function(p){if(!p||!p.id||!p.n||!p.u){return;}if(ids[p.id]){da++;return;}ids[p.id]=1;names[p.n.toLowerCase()]=1;data.places.push(p);neu++;});
+   (b.cities||[]).forEach(function(c){if(!c||!c.k||!c.n){return;}var have=cityByKey(c.k);if(!have){data.cities.push({k:c.k,n:c.n,pre:(c.pre||[]).slice()});}else{(c.pre||[]).forEach(function(x){if(have.pre.indexOf(x)<0){have.pre.push(x);}});}});
    var e=b.edits||{};Object.keys(e).forEach(function(k){if(ids[k]&&e[k]&&typeof e[k]==="object"){data.edits[k]=e[k];ed++;}});});
   found.forEach(function(p){if(ids[p.id]||(p.star&&names[p.n.toLowerCase()])){da++;return;}
    delete p.star;ids[p.id]=1;names[p.n.toLowerCase()]=1;data.places.push(p);neu++;});
@@ -296,7 +309,7 @@ function importFile(f){
 /* ---------- Sicherung ---------- */
 function backup(){
  var d=new Date(),ds=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
- var name="Meine-Orte-Sicherung-"+ds+".json",txt=JSON.stringify({app:"meine-orte",version:1,stand:d.toISOString(),places:data.places,edits:data.edits});
+ var name="Meine-Orte-Sicherung-"+ds+".json",txt=JSON.stringify({app:"meine-orte",version:1,stand:d.toISOString(),places:data.places,edits:data.edits,cities:data.cities});
  var file=null;try{file=new File([txt],name,{type:"application/json"});}catch(e){}
  if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
   navigator.share({files:[file],title:name}).then(function(){msg="Sicherung weitergegeben: "+name;render();},function(err){if(!err||err.name!=="AbortError"){download(txt,name);}});
@@ -305,12 +318,12 @@ function backup(){
 function download(txt,name){var url=URL.createObjectURL(new Blob([txt],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},4000);msg="Sicherung gespeichert: "+name+" (Ordner Downloads)";render();}
 
 function wipe(){
- data={places:[],edits:{}};pending=null;view.edit=null;view.open={};
+ data={places:[],edits:{},cities:JSON.parse(JSON.stringify(CITY0))};pending=null;view.edit=null;view.open={};
  try{localStorage.removeItem(KEY);localStorage.removeItem(VKEY);}catch(e){}
  var jobs=[];
  try{if(window.caches){jobs.push(caches.keys().then(function(k){return Promise.all(k.map(function(n){return caches.delete(n);}));}));}}catch(e){}
  try{if(navigator.serviceWorker){jobs.push(navigator.serviceWorker.getRegistrations().then(function(r){return Promise.all(r.map(function(x){return x.unregister();}));}));}}catch(e){}
- msg="Alle Daten sind aus der App gelöscht.";render();
+ ORTE=orteList();msg="Alle Daten sind aus der App gelöscht.";render();
  Promise.all(jobs).catch(function(){}).then(function(){try{localStorage.removeItem(VKEY);}catch(e){}});}
 /* ---------- Bedienung ---------- */
 document.addEventListener("click",function(ev){
@@ -325,8 +338,10 @@ document.addEventListener("click",function(ev){
  if(a==="all-no"){askAll=false;render();return;}
  if(a==="all-yes"){askAll=false;wipe();return;}
  var c=t.closest(".card");if(!c){return;}var p=byId(c.dataset.id);if(!p){return;}
- if(a==="edit"){view.edit=view.edit===p.id?null:p.id;render();}
+ if(a==="edit"){view.edit=view.edit===p.id?null:p.id;newCity=false;render();}
  if(a==="ok"){setE(p,"ok",1);render();}
+ if(a==="city-add"){var nm=($("ed-city").value||"").trim();if(!nm){return;}var ex=null;data.cities.forEach(function(c){if(c.n.toLowerCase()===nm.toLowerCase()){ex=c;}});
+  if(!ex){ex={k:"c"+Date.now().toString(36),n:nm,pre:[]};data.cities.push(ex);}newCity=false;setCity(p,ex.k);msg="„"+p.n+"“ liegt jetzt in "+ex.n+".";render();}
  if(a==="del"){askDel=p.id;render();}
  if(a==="del-no"){askDel=null;render();}
  if(a==="del-yes"){askDel=null;removePlaces([p.id]);msg="„"+p.n+"“ gelöscht.";render();}});
@@ -338,7 +353,7 @@ document.addEventListener("change",function(ev){var id=ev.target.id,p=view.edit?
  if(id==="flt"){view.flt=ev.target.value;render();return;}
  if(!p){return;}
  if(id==="ed-cat"){var nv=ev.target.value;setE(p,"c",nv===p.c?"":nv);if(p.q){setE(p,"ok",1);}view.open[(ortOfP(p))+"|"+nv]=1;render();}
- if(id==="ed-ort"){setE(p,"o",ev.target.value===p.o?"":ev.target.value);view.open[ev.target.value+"|"+cat(p)]=1;render();}
+ if(id==="ed-ort"){var k=ev.target.value;if(k==="+neu"){newCity=true;render();var ci=$("ed-city");if(ci){ci.focus();}return;}newCity=false;setCity(p,k);render();}
  if(id==="ed-v"){setE(p,"v",ev.target.checked?1:0);render();}
  if(id==="ed-r"){setE(p,"r",+ev.target.value);render();}});
 var tq=null;

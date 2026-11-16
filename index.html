@@ -70,6 +70,12 @@ ol.steps li::marker{font-weight:700;color:var(--acc)}
 .tab{flex:1;max-width:240px;background:none;border:0;font:600 15px var(--f-b);color:var(--mute);padding:10px 6px;border-radius:10px;cursor:pointer}
 .tab[aria-selected=true]{color:var(--acc);background:var(--soft)}
 .hidden{display:none}
+.btn.d{background:transparent;color:#b3261e;border-color:#b3261e}
+.btn.dp{background:#b3261e;color:#fff;border-color:#b3261e}
+@media (prefers-color-scheme:dark){.btn.d{color:#ff8a80;border-color:#ff8a80}.btn.dp{background:#ff8a80;color:#2b0000;border-color:#ff8a80}}
+.ask{border:2px solid #b3261e;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:var(--card)}
+.ask ul{margin:0;padding-left:20px;max-height:300px;overflow:auto;font-size:15px}
+.ask .acts .btn{flex:1}
 </style>
 </head>
 <body>
@@ -100,7 +106,7 @@ var view={tab:"orte",q:"",ort:"alle",flt:"alle",edit:null,open:{}};
 try{var v=JSON.parse(localStorage.getItem(VKEY)||"null");if(v){view.tab=v.tab||"orte";view.ort=v.ort||"alle";view.flt=v.flt||"alle";view.open=v.open||{};}}catch(e){}
 if(location.hash==="#anleitung"){view.tab="anleitung";}
 function saveView(){try{localStorage.setItem(VKEY,JSON.stringify({tab:view.tab,ort:view.ort,flt:view.flt,open:view.open}));}catch(e){}}
-var msg="";
+var msg="",pending=null,askDel=null,askAll=false;
 
 /* ---------- Ortslogik ---------- */
 function E(p){return data.edits[p.id]||{};}
@@ -111,6 +117,8 @@ function setE(p,k,val){var e=data.edits[p.id]||{};
  if(val===""||val===0||val===false||val===null){delete e[k];}else{e[k]=val;}
  if(Object.keys(e).length){data.edits[p.id]=e;}else{delete data.edits[p.id];}
  persist();}
+function srcOf(p){return /^cid/.test(p.id)?"stern":"liste";}
+function removePlaces(ids){var set={};ids.forEach(function(i){set[i]=1;delete data.edits[i];});data.places=data.places.filter(function(p){return !set[p.id];});if(set[view.edit]){view.edit=null;}persist();}
 function byId(id){for(var i=0;i<data.places.length;i++){if(data.places[i].id===id){return data.places[i];}}return null;}
 function match(p){
  if(view.flt==="war"&&!E(p).v){return false;}
@@ -135,7 +143,10 @@ function card(p){
   if(unsure(p)){h+='<button type="button" class="btn s" data-act="ok">Kategorie passt</button>';}
   h+='<label class="ck"><input type="checkbox" id="ed-v"'+(e.v?" checked":"")+">War ich schon</label>";
   h+='<label>Bewertung<select id="ed-r">'+[0,1,2,3,4,5].map(function(n){return '<option value="'+n+'"'+((e.r||0)===n?" selected":"")+">"+(n?n+" von 5 Sternen":"keine")+"</option>";}).join("")+"</select></label>";
-  h+='<label>Notiz<textarea id="ed-n">'+esc(note(p))+"</textarea></label></div>";}
+  h+='<label>Notiz<textarea id="ed-n">'+esc(note(p))+"</textarea></label>";
+  if(askDel===p.id){h+='<div class="ask"><p>„'+esc(p.n)+'“ mit Notiz und Bewertung aus der App löschen?</p><div class="acts"><button type="button" class="btn dp" data-act="del-yes">Ja, löschen</button><button type="button" class="btn s" data-act="del-no">Abbrechen</button></div></div>';}
+  else{h+='<button type="button" class="btn d" data-act="del">Ort aus der App löschen</button>';}
+  h+="</div>";}
  return h+"</div>";}
 function ortOfP(p){return E(p).o||p.o;}
 function renderOrte(){
@@ -164,6 +175,12 @@ function renderOrte(){
 function renderAnl(){
  var h='<header><h1>Anleitung und Import</h1><p class="sub">'+data.places.length+" Orte in der App</p></header>";
  if(msg){h+='<div class="msg">'+esc(msg)+"</div>";}
+ if(pending&&pending.length){
+  var many=pending.length>data.places.length/2;
+  h+='<section class="ask"><h2 style="margin:0;font:700 19px var(--f-d)">'+pending.length+(pending.length===1?" Ort steht":" Orte stehen")+' nicht mehr in der Datei</h2><p>Diese Orte hast du vermutlich in Google Maps gelöscht. Sollen sie auch aus der App verschwinden? Notizen und Bewertungen gehen dabei mit.</p>'+
+  (many?'<p><strong>Das ist mehr als die Hälfte deiner Orte. Bitte prüfen, ob die richtige Datei gewählt war.</strong></p>':'')+
+  "<ul>"+pending.map(function(id){var p=byId(id);return p?"<li>"+esc(p.n)+" <span class=\"meta\">("+esc(ON[ortOfP(p)])+")</span></li>":"";}).join("")+"</ul>"+
+  '<div class="acts"><button type="button" class="btn dp" data-act="pend-del">'+(pending.length===1?"Diesen Ort löschen":"Diese "+pending.length+" Orte löschen")+'</button><button type="button" class="btn s" data-act="pend-keep">Behalten</button></div></section>';}
  h+='<section class="box"><h2>1. Datei bei Google holen</h2><ol class="steps">'+
  '<li>In Google Maps neue Orte wie gewohnt in der Liste „Favoriten“ speichern.</li>'+
  '<li><a href="https://takeout.google.com" target="_blank" rel="noopener">takeout.google.com</a> öffnen und mit dem Google-Konto anmelden.</li>'+
@@ -178,11 +195,16 @@ function renderAnl(){
  '<li>Unten „Datei wählen“ antippen.</li>'+
  '<li>Im Fenster „Durchsuchen“ wählen, dann „Downloads“ und die Datei takeout-….zip antippen.</li>'+
  '<li>Die App meldet, wie viele Orte neu sind. Bekannte Orte und deine Bearbeitungen bleiben unverändert.</li>'+
+ '<li>Hast du in Google Maps Orte gelöscht, zeigt die App sie hier als Liste. Du entscheidest, ob sie auch aus der App verschwinden.</li>'+
  '<li>Neue Orte zeigt der Filter „Kategorie prüfen“ im Reiter „Orte“. Dort Kategorie und Stadt kontrollieren.</li>'+
  '</ol><label class="btn p" for="imp">Datei wählen<input type="file" id="imp" accept=".zip,.csv,.json,application/zip,text/csv,application/json" hidden></label>'+
  '<p class="sub">Die App nimmt die Takeout-ZIP, die einzelne CSV oder JSON daraus und die eigene Sicherungsdatei.</p></section>';
  h+='<section class="box"><h2>3. Sicherung</h2><p>Die Orte und deine Bearbeitungen liegen nur auf diesem Gerät. Ab und zu eine Sicherung anlegen und in „Dateien“ ablegen. Mit derselben Datei bringst du alles auf das iPhone: Sicherung erstellen, per AirDrop schicken, dort unter „Datei wählen“ laden.</p>'+
  '<button type="button" class="btn p" data-act="backup">Sicherung erstellen</button></section>';
+ h+='<section class="box"><h2>4. Alle Daten löschen</h2><p>Löscht alle Orte, Notizen und Bewertungen aus der App auf diesem Gerät. Dateien in „Dateien“ oder Drive bleiben, die löschst du dort selbst.</p>';
+ if(askAll){h+='<div class="ask"><p><strong>Wirklich alles löschen?</strong> Ohne Sicherung lässt sich das nicht rückgängig machen.</p><div class="acts"><button type="button" class="btn dp" data-act="all-yes">Ja, alles löschen</button><button type="button" class="btn s" data-act="all-no">Abbrechen</button></div></div>';}
+ else{h+='<button type="button" class="btn d" data-act="all">Alle Daten löschen</button>';}
+ h+="</section>";
  if(!storeOk){h+='<div class="msg">Das Gerät hat die letzte Änderung nicht gespeichert. Bitte eine Sicherung erstellen.</div>';}
  return h;}
 
@@ -237,8 +259,9 @@ function unzip(buf){
 function parseText(name,text){
  if(/\.json$/i.test(name)||/^\s*\{/.test(text)){var j;try{j=JSON.parse(text);}catch(e){return {places:[]};}
   if(j&&j.app==="meine-orte"){return {backup:j};}
-  return {places:fromGeo(j)};}
- return {places:fromCSV(text)};}
+  return {places:fromGeo(j),src:j&&j.features?"stern":null};}
+ var rows=fromCSV(text);return {places:rows,src:csvOk(text)?"liste":null};}
+function csvOk(t){var l=t.replace(/^\uFEFF/,"").split(/\r?\n/)[0].toLowerCase();return /(title|titel)/.test(l)&&/(url|link)/.test(l);}
 function readFile(f){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result);};r.onerror=function(){rej(new Error("lesen"));};r.readAsArrayBuffer(f);});}
 function importFile(f){
  msg="Datei wird gelesen …";render();
@@ -250,14 +273,17 @@ function importFile(f){
   return [{name:f.name,text:new TextDecoder("utf-8").decode(u8)}];
  }).then(function(files){
   if(!files.length){throw new Error("leer");}
-  var found=[],backups=[];
-  files.forEach(function(x){var r=parseText(x.name,x.text);if(r.backup){backups.push(r.backup);}else{found=found.concat(r.places);}});
+  var found=[],backups=[],srcs={};
+  files.forEach(function(x){var r=parseText(x.name,x.text);if(r.backup){backups.push(r.backup);}else{found=found.concat(r.places);if(r.src){srcs[r.src]=1;}}});
+  var fids={};found.forEach(function(p){fids[p.id]=1;});
   var ids={},names={},neu=0,da=0,ed=0;
   data.places.forEach(function(p){ids[p.id]=1;names[p.n.toLowerCase()]=1;});
   backups.forEach(function(b){(b.places||[]).forEach(function(p){if(!p||!p.id||!p.n||!p.u){return;}if(ids[p.id]){da++;return;}ids[p.id]=1;names[p.n.toLowerCase()]=1;data.places.push(p);neu++;});
    var e=b.edits||{};Object.keys(e).forEach(function(k){if(ids[k]&&e[k]&&typeof e[k]==="object"){data.edits[k]=e[k];ed++;}});});
   found.forEach(function(p){if(ids[p.id]||(p.star&&names[p.n.toLowerCase()])){da++;return;}
    delete p.star;ids[p.id]=1;names[p.n.toLowerCase()]=1;data.places.push(p);neu++;});
+  pending=null;
+  if(!backups.length&&found.length){var miss=data.places.filter(function(p){return srcs[srcOf(p)]&&!fids[p.id];}).map(function(p){return p.id;});if(miss.length){pending=miss;}}
   persist();
   if(!backups.length&&!found.length){msg="In dieser Datei stehen keine Orte. Google liefert manchmal zwei ZIP-Dateien: bitte die mit „-1-“ im Namen wählen.";}
   else if(!neu&&!ed){msg="Nichts Neues: alle "+da+" Orte der Datei sind schon in der App.";}
@@ -278,16 +304,32 @@ function backup(){
  download(txt,name);}
 function download(txt,name){var url=URL.createObjectURL(new Blob([txt],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},4000);msg="Sicherung gespeichert: "+name+" (Ordner Downloads)";render();}
 
+function wipe(){
+ data={places:[],edits:{}};pending=null;view.edit=null;view.open={};
+ try{localStorage.removeItem(KEY);localStorage.removeItem(VKEY);}catch(e){}
+ var jobs=[];
+ try{if(window.caches){jobs.push(caches.keys().then(function(k){return Promise.all(k.map(function(n){return caches.delete(n);}));}));}}catch(e){}
+ try{if(navigator.serviceWorker){jobs.push(navigator.serviceWorker.getRegistrations().then(function(r){return Promise.all(r.map(function(x){return x.unregister();}));}));}}catch(e){}
+ msg="Alle Daten sind aus der App gelöscht.";render();
+ Promise.all(jobs).catch(function(){}).then(function(){try{localStorage.removeItem(VKEY);}catch(e){}});}
 /* ---------- Bedienung ---------- */
 document.addEventListener("click",function(ev){
  var t=ev.target.closest("[data-tab],[data-ort],[data-act]");if(!t){return;}
- if(t.dataset.tab){if(view.tab!==t.dataset.tab){view.tab=t.dataset.tab;msg="";render();window.scrollTo(0,0);}return;}
+ if(t.dataset.tab){if(view.tab!==t.dataset.tab){view.tab=t.dataset.tab;msg="";askAll=false;askDel=null;render();window.scrollTo(0,0);}return;}
  if(t.dataset.ort){view.ort=t.dataset.ort;render();return;}
  var a=t.dataset.act;
  if(a==="backup"){backup();return;}
+ if(a==="pend-del"){var n=pending.length;removePlaces(pending);pending=null;msg=n+(n===1?" Ort":" Orte")+" gelöscht.";render();return;}
+ if(a==="pend-keep"){pending=null;msg="Die Orte bleiben in der App.";render();return;}
+ if(a==="all"){askAll=true;render();return;}
+ if(a==="all-no"){askAll=false;render();return;}
+ if(a==="all-yes"){askAll=false;wipe();return;}
  var c=t.closest(".card");if(!c){return;}var p=byId(c.dataset.id);if(!p){return;}
  if(a==="edit"){view.edit=view.edit===p.id?null:p.id;render();}
- if(a==="ok"){setE(p,"ok",1);render();}});
+ if(a==="ok"){setE(p,"ok",1);render();}
+ if(a==="del"){askDel=p.id;render();}
+ if(a==="del-no"){askDel=null;render();}
+ if(a==="del-yes"){askDel=null;removePlaces([p.id]);msg="„"+p.n+"“ gelöscht.";render();}});
 document.addEventListener("toggle",function(ev){var d=ev.target;if(d.tagName!=="DETAILS"||!d.dataset.key){return;}
  if(view.q||view.flt!=="alle"){return;}
  if(d.open){view.open[d.dataset.key]=1;}else{delete view.open[d.dataset.key];}saveView();},true);

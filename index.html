@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meine Orte</title>
+<meta name="theme-color" content="#0b6e7f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Meine Orte">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+/* Layout: eine Spalte, oben Suche und Stadtwahl, darunter Stadt > Kategorie zum Aufklappen, unten zwei Reiter */
+:root{--bg:#f3f5f6;--card:#ffffff;--ink:#14232b;--mute:#5d6f78;--line:#d9e0e4;--acc:#0b6e7f;--acc-ink:#ffffff;--soft:#e3f0f2;--warn:#a85a00;--warn-bg:#fdf0dc;--ok:#1d7a3e;
+--f-d:"Avenir Next","Segoe UI",system-ui,sans-serif;--f-b:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#0f1a1f;--card:#18262d;--ink:#e8eef0;--mute:#9db0b8;--line:#2b3d46;--acc:#4fc3d4;--acc-ink:#062a31;--soft:#1d3640;--warn:#ffc27a;--warn-bg:#3b2a12;--ok:#7fd69c}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--f-b);-webkit-text-size-adjust:100%}
+main{max-width:760px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(90px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:12px}
+h1{font:700 26px/1.1 var(--f-d);margin:0}
+.sub{color:var(--mute);font-size:14px;margin:0}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)}
+input[type=search],select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+textarea{min-height:70px;resize:vertical}
+.row2{display:flex;gap:8px}.row2>*{flex:1;min-width:0}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:500 15px var(--f-b);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer}
+.chip b{font-weight:500;color:var(--mute);margin-left:4px;font-variant-numeric:tabular-nums}
+.chip[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.chip[aria-pressed=true] b{color:var(--acc-ink)}
+.city{display:flex;flex-direction:column;gap:6px}
+.city>h2{font:700 22px var(--f-d);margin:14px 0 2px;display:flex;align-items:baseline;gap:8px;border-bottom:2px solid var(--acc);padding-bottom:4px}
+.city>h2 span,summary span{font:400 14px var(--f-b);color:var(--mute);font-variant-numeric:tabular-nums}
+details{background:var(--card);border:1px solid var(--line);border-radius:12px}
+summary{list-style:none;cursor:pointer;padding:12px 14px;font:600 17px var(--f-d);display:flex;align-items:center;gap:8px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(-45deg);transition:transform .15s;flex:none;margin-right:4px}
+details[open]>summary::before{transform:rotate(45deg)}
+summary .flag{margin-left:auto}
+.list{display:flex;flex-direction:column;gap:8px;padding:0 10px 10px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.card.done{border-left:4px solid var(--acc)}
+.nm{font-weight:600;overflow-wrap:anywhere}
+.meta{color:var(--mute);font-size:14px;overflow-wrap:anywhere}
+.note{font-size:14px;overflow-wrap:anywhere}
+.pill{display:inline-block;font-size:12px;font-weight:600;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:2px 6px}
+.stars{color:var(--acc);letter-spacing:1px}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:600 15px var(--f-b);border-radius:10px;padding:10px 14px;border:1px solid var(--acc);cursor:pointer;text-decoration:none;text-align:center;display:inline-block}
+.btn.p{background:var(--acc);color:var(--acc-ink)}
+.acts .btn.p{flex:1}
+.btn.s{background:transparent;color:var(--acc)}
+.btn:focus-visible,.chip:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.tab:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.ed{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:8px}
+.ed label{font-size:13px;color:var(--mute);display:flex;flex-direction:column;gap:4px}
+.ed label.ck{flex-direction:row;align-items:center;gap:8px;font-size:15px;color:var(--ink)}
+.ed input[type=checkbox]{width:22px;height:22px;accent-color:var(--acc)}
+.empty{color:var(--mute);padding:24px 0;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+.msg{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:15px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.box h2{font:700 19px var(--f-d);margin:0}
+ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px;text-align:justify;hyphens:auto}
+ol.steps li::marker{font-weight:700;color:var(--acc)}
+.box p{margin:0;text-align:justify;hyphens:auto}
+.box a{color:var(--acc);font-weight:600}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+.tab{flex:1;max-width:240px;background:none;border:0;font:600 15px var(--f-b);color:var(--mute);padding:10px 6px;border-radius:10px;cursor:pointer}
+.tab[aria-selected=true]{color:var(--acc);background:var(--soft)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<main id="root"></main>
+<nav class="tabs" role="tablist">
+<button type="button" class="tab" role="tab" id="tab-orte" data-tab="orte">Orte</button>
+<button type="button" class="tab" role="tab" id="tab-anl" data-tab="anleitung">Anleitung und Import</button>
+</nav>
+<script>
+(function(){
+"use strict";
+var CATS=[["hotel","Hotel"],["restaurant","Restaurant"],["cafe","Café und Bäckerei"],["bar","Bar und Pub"],["rooftop","Rooftop-Bar"],["nacht","Gogo und Club"],["massage","Massage und Spa"],["laundry","Wäscherei"],["geld","Geld und Wechselstube"],["shop","Einkaufen"],["gesund","Klinik und Apotheke"],["schneider","Schneider"],["sonst","Sonstiges"]];
+var CN={};CATS.forEach(function(c){CN[c[0]]=c[1];});
+var ORTE=[["bkk","Bangkok"],["pty","Pattaya"],["and","Andere Orte"]];
+var ON={bkk:"Bangkok",pty:"Pattaya",and:"Andere Orte"};
+var KEY="meine-orte-daten",VKEY="meine-orte-ansicht";
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+
+/* ---------- Speicher ---------- */
+var data={places:[],edits:{}};
+try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.places){data={places:d.places,edits:d.edits||{}};}}}catch(e){}
+var storeOk=true;
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));storeOk=true;}catch(e){storeOk=false;}}
+try{if(navigator.storage&&navigator.storage.persist){navigator.storage.persist();}}catch(e){}
+
+var view={tab:"orte",q:"",ort:"alle",flt:"alle",edit:null,open:{}};
+try{var v=JSON.parse(localStorage.getItem(VKEY)||"null");if(v){view.tab=v.tab||"orte";view.ort=v.ort||"alle";view.flt=v.flt||"alle";view.open=v.open||{};}}catch(e){}
+if(location.hash==="#anleitung"){view.tab="anleitung";}
+function saveView(){try{localStorage.setItem(VKEY,JSON.stringify({tab:view.tab,ort:view.ort,flt:view.flt,open:view.open}));}catch(e){}}
+var msg="";
+
+/* ---------- Ortslogik ---------- */
+function E(p){return data.edits[p.id]||{};}
+function cat(p){return E(p).c||p.c;}
+function note(p){var e=E(p);return e.n!==undefined?e.n:(p.g||"");}
+function unsure(p){return p.q&&!E(p).ok&&!E(p).c;}
+function setE(p,k,val){var e=data.edits[p.id]||{};
+ if(val===""||val===0||val===false||val===null){delete e[k];}else{e[k]=val;}
+ if(Object.keys(e).length){data.edits[p.id]=e;}else{delete data.edits[p.id];}
+ persist();}
+function byId(id){for(var i=0;i<data.places.length;i++){if(data.places[i].id===id){return data.places[i];}}return null;}
+function match(p){
+ if(view.flt==="war"&&!E(p).v){return false;}
+ if(view.flt==="neu"&&E(p).v){return false;}
+ if(view.flt==="pruef"&&!unsure(p)){return false;}
+ if(view.flt==="top"&&!(E(p).r>=4)){return false;}
+ if(view.q){var t=(p.n+" "+note(p)+" "+(p.a||"")).toLowerCase();if(t.indexOf(view.q.toLowerCase())<0){return false;}}
+ return true;}
+
+/* ---------- Anzeige: Orte ---------- */
+function card(p){
+ var e=E(p),h='<div class="card'+(e.v?" done":"")+'" data-id="'+esc(p.id)+'"><div><div class="nm">'+esc(p.n)+"</div>";
+ var m=[];if(e.v){m.push("war ich");}if(e.r){m.push('<span class="stars">'+"★★★★★".slice(0,e.r)+"</span>");}
+ if(m.length){h+='<div class="meta">'+m.join(" · ")+"</div>";}
+ if(p.a){h+='<div class="meta">'+esc(p.a)+"</div>";}
+ if(note(p)){h+='<div class="note">'+esc(note(p))+"</div>";}
+ if(unsure(p)){h+='<span class="pill">Kategorie prüfen</span>';}
+ h+='</div><div class="acts"><a class="btn p" href="'+esc(p.u)+'" target="_blank" rel="noopener">In Maps öffnen</a><button type="button" class="btn s" data-act="edit">'+(view.edit===p.id?"Schließen":"Bearbeiten")+"</button></div>";
+ if(view.edit===p.id){
+  h+='<div class="ed"><label>Kategorie<select id="ed-cat">'+CATS.map(function(c){return '<option value="'+c[0]+'"'+(cat(p)===c[0]?" selected":"")+">"+esc(c[1])+"</option>";}).join("")+"</select></label>";
+  h+='<label>Stadt<select id="ed-ort">'+ORTE.map(function(o){return '<option value="'+o[0]+'"'+((e.o||p.o)===o[0]?" selected":"")+">"+o[1]+"</option>";}).join("")+"</select></label>";
+  if(unsure(p)){h+='<button type="button" class="btn s" data-act="ok">Kategorie passt</button>';}
+  h+='<label class="ck"><input type="checkbox" id="ed-v"'+(e.v?" checked":"")+">War ich schon</label>";
+  h+='<label>Bewertung<select id="ed-r">'+[0,1,2,3,4,5].map(function(n){return '<option value="'+n+'"'+((e.r||0)===n?" selected":"")+">"+(n?n+" von 5 Sternen":"keine")+"</option>";}).join("")+"</select></label>";
+  h+='<label>Notiz<textarea id="ed-n">'+esc(note(p))+"</textarea></label></div>";}
+ return h+"</div>";}
+function ortOfP(p){return E(p).o||p.o;}
+function renderOrte(){
+ var all=data.places;
+ if(!all.length){return '<header><h1>Meine Orte</h1></header><div class="empty"><p>Noch keine Orte in der App.</p><p>Im Reiter „Anleitung und Import“ die Startdatei oder eine Datei aus Google Takeout laden.</p><button type="button" class="btn p" data-tab="anleitung">Zur Anleitung</button></div>';}
+ var pool=all.filter(match),oc={alle:pool.length};pool.forEach(function(p){var o=ortOfP(p);oc[o]=(oc[o]||0)+1;});
+ var shown=pool.filter(function(p){return view.ort==="alle"||ortOfP(p)===view.ort;});
+ var auto=!!view.q||view.flt!=="alle";
+ var h='<header><h1>Meine Orte</h1><p class="sub">'+all.length+" Orte gespeichert, "+shown.length+" angezeigt</p></header>";
+ h+='<div class="top"><div class="row2"><input type="search" id="q" placeholder="Suchen" value="'+esc(view.q)+'"><select id="flt" aria-label="Filter">'+[["alle","Alle"],["neu","Noch nicht besucht"],["war","War ich schon"],["top","4 und 5 Sterne"],["pruef","Kategorie prüfen"]].map(function(f){return '<option value="'+f[0]+'"'+(view.flt===f[0]?" selected":"")+">"+f[1]+"</option>";}).join("")+"</select></div>";
+ h+='<div class="seg">'+[["alle","Alle"]].concat(ORTE).filter(function(o){return o[0]==="alle"||oc[o[0]];}).map(function(o){return '<button type="button" class="chip" data-ort="'+o[0]+'" aria-pressed="'+(view.ort===o[0])+'">'+(o[0]==="and"?"Andere":o[1])+"<b>"+(oc[o[0]]||0)+"</b></button>";}).join("")+"</div></div>";
+ if(msg){h+='<div class="msg">'+esc(msg)+"</div>";}
+ if(!shown.length){h+='<p class="empty">Kein Ort passt zu dieser Auswahl.</p>';}
+ ORTE.forEach(function(o){
+  var inCity=shown.filter(function(p){return ortOfP(p)===o[0];});if(!inCity.length){return;}
+  h+='<section class="city"><h2>'+o[1]+" <span>"+inCity.length+"</span></h2>";
+  CATS.forEach(function(c){var l=inCity.filter(function(p){return cat(p)===c[0];});if(!l.length){return;}
+   l.sort(function(a,b){return a.n.localeCompare(b.n,"de",{sensitivity:"base"});});
+   var k=o[0]+"|"+c[0],isOpen=auto||view.open[k]||l.some(function(p){return p.id===view.edit;});
+   var nPr=l.filter(unsure).length;
+   h+='<details data-key="'+k+'"'+(isOpen?" open":"")+"><summary>"+esc(c[1])+" <span>"+l.length+"</span>"+(nPr&&view.flt!=="pruef"?'<span class="pill flag">'+nPr+" prüfen</span>":"")+'</summary><div class="list">'+l.map(card).join("")+"</div></details>";});
+  h+="</section>";});
+ return h;}
+
+/* ---------- Anzeige: Anleitung ---------- */
+function renderAnl(){
+ var h='<header><h1>Anleitung und Import</h1><p class="sub">'+data.places.length+" Orte in der App</p></header>";
+ if(msg){h+='<div class="msg">'+esc(msg)+"</div>";}
+ h+='<section class="box"><h2>1. Datei bei Google holen</h2><ol class="steps">'+
+ '<li>In Google Maps neue Orte wie gewohnt in der Liste „Favoriten“ speichern.</li>'+
+ '<li><a href="https://takeout.google.com" target="_blank" rel="noopener">takeout.google.com</a> öffnen und mit dem Google-Konto anmelden.</li>'+
+ '<li>Oben in der Liste „Auswahl aufheben“ antippen, damit nichts anderes mitkommt.</li>'+
+ '<li>Nach unten blättern und genau zwei Häkchen setzen: „Gespeichert“ und „Maps (meine Orte)“.</li>'+
+ '<li>Ganz unten „Nächster Schritt“ antippen.</li>'+
+ '<li>„Einmal exportieren“ und Dateityp „.zip“ lassen, dann „Export erstellen“ antippen.</li>'+
+ '<li>Auf die Mail von Google warten, meist wenige Minuten. In der Mail „Dateien herunterladen“ antippen und das Google-Passwort eingeben.</li>'+
+ '<li>Die ZIP-Datei landet in der App „Dateien“ im Ordner „Downloads“. Entpacken ist nicht nötig. Kommen zwei ZIP-Dateien, ist die mit „-1-“ im Namen die richtige.</li>'+
+ '</ol></section>';
+ h+='<section class="box"><h2>2. Datei in die App laden</h2><ol class="steps">'+
+ '<li>Unten „Datei wählen“ antippen.</li>'+
+ '<li>Im Fenster „Durchsuchen“ wählen, dann „Downloads“ und die Datei takeout-….zip antippen.</li>'+
+ '<li>Die App meldet, wie viele Orte neu sind. Bekannte Orte und deine Bearbeitungen bleiben unverändert.</li>'+
+ '<li>Neue Orte zeigt der Filter „Kategorie prüfen“ im Reiter „Orte“. Dort Kategorie und Stadt kontrollieren.</li>'+
+ '</ol><label class="btn p" for="imp">Datei wählen<input type="file" id="imp" accept=".zip,.csv,.json,application/zip,text/csv,application/json" hidden></label>'+
+ '<p class="sub">Die App nimmt die Takeout-ZIP, die einzelne CSV oder JSON daraus und die eigene Sicherungsdatei.</p></section>';
+ h+='<section class="box"><h2>3. Sicherung</h2><p>Die Orte und deine Bearbeitungen liegen nur auf diesem Gerät. Ab und zu eine Sicherung anlegen und in „Dateien“ ablegen. Mit derselben Datei bringst du alles auf das iPhone: Sicherung erstellen, per AirDrop schicken, dort unter „Datei wählen“ laden.</p>'+
+ '<button type="button" class="btn p" data-act="backup">Sicherung erstellen</button></section>';
+ if(!storeOk){h+='<div class="msg">Das Gerät hat die letzte Änderung nicht gespeichert. Bitte eine Sicherung erstellen.</div>';}
+ return h;}
+
+function render(focusQ){
+ var y=window.scrollY;
+ $("root").innerHTML=view.tab==="orte"?renderOrte():renderAnl();
+ $("tab-orte").setAttribute("aria-selected",view.tab==="orte");
+ $("tab-anl").setAttribute("aria-selected",view.tab==="anleitung");
+ window.scrollTo(0,y);
+ if(focusQ){var q=$("q");if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length);}}
+ saveView();}
+
+/* ---------- Import ---------- */
+var GUESS=[["schneider",/tailor|clothier|schneider/],["laundry",/laundry|wäscherei/],["geld",/exchange|\bbank\b|atm|money|wechsel/],["gesund",/clinic|klinik|hospital|pharmac|apotheke|dental|boots/],["massage",/massage|\bspa\b|nuru|soap/],["rooftop",/rooftop|sky ?bar/],["hotel",/hotel|resort|residence|lodge|guest ?house|hostel|\binn\b|condo/],["nacht",/a ?go ?go|club|gentlemen/],["cafe",/caf[eé]|coffee|bakery|pastry|bäckerei|กาแฟ/],["restaurant",/restaurant|pizz|burger|steak|grill|bistro|kitchen|food|trattoria|ristorante|bbq|thai food/],["bar",/\bbar\b|\bpub\b|beer|lounge|biergarten|kneipe/],["shop",/mall|market|shop|7-eleven|big c|plaza|center|centre|central/]];
+function guess(n){n=n.toLowerCase();for(var i=0;i<GUESS.length;i++){if(GUESS[i][1].test(n)){return GUESS[i][0];}}return "sonst";}
+function ortOfUrl(u){var m=/1s(0x[0-9a-f]+):/.exec(u),p=m?m[1].slice(0,6):"";return p==="0x30e2"?"bkk":p==="0x3102"?"pty":"and";}
+function parseCSV(t){var rows=[],row=[],f="",q=false,i=0,c;t=t.replace(/^\uFEFF/,"");
+ for(;i<t.length;i++){c=t[i];
+  if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++;}else{q=false;}}else{f+=c;}}
+  else if(c==='"'){q=true;}else if(c===","){row.push(f);f="";}
+  else if(c==="\n"||c==="\r"){if(c==="\r"&&t[i+1]==="\n"){i++;}row.push(f);rows.push(row);row=[];f="";}
+  else{f+=c;}}
+ if(f||row.length){row.push(f);rows.push(row);}return rows;}
+function fromCSV(t){var rows=parseCSV(t),out=[];if(!rows.length){return out;}
+ var hd=rows[0].map(function(x){return x.trim().toLowerCase();});
+ function col(a){for(var i=0;i<a.length;i++){var j=hd.indexOf(a[i]);if(j>=0){return j;}}return -1;}
+ var iu=col(["url","link"]),it=col(["title","titel"]),inn=col(["note","notiz"]);
+ if(iu<0||it<0){return out;}
+ rows.slice(1).forEach(function(r){var n=(r[it]||"").trim(),u=(r[iu]||"").trim();if(!n||!/^https?:/.test(u)){return;}
+  var m=/1s(0x[0-9a-f]+:0x[0-9a-f]+)/.exec(u);
+  out.push({id:m?m[1]:"u:"+u,n:n,u:u,c:guess(n),o:ortOfUrl(u),g:inn>=0?(r[inn]||"").trim():"",q:1,a:""});});
+ return out;}
+function fromGeo(j){var out=[];(j.features||[]).forEach(function(f){var pr=f.properties||{},loc=pr.location||{},u=String(pr.google_maps_url||"").replace(/^http:/,"https:"),n=(loc.name||pr.Title||"").trim();
+  if(!n||!u){return;}var m=/cid=(\d+)/.exec(u),a=loc.address||"";
+  out.push({id:m?"cid"+m[1]:"u:"+u,n:n,u:u,c:guess(n),o:/Bangkok/i.test(a)?"bkk":/Pattaya|Chon ?Buri|Bang Lamung/i.test(a)?"pty":"and",g:"",q:1,a:a,star:1});});
+ return out;}
+/* ZIP lesen ohne Zusatzbibliothek */
+function inflate(bytes){return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();}
+function unzip(buf){
+ var dv=new DataView(buf),u8=new Uint8Array(buf),eo=-1,i;
+ for(i=u8.length-22;i>=Math.max(0,u8.length-65557);i--){if(dv.getUint32(i,true)===0x06054b50){eo=i;break;}}
+ if(eo<0){return Promise.reject(new Error("keinzip"));}
+ var n=dv.getUint16(eo+10,true),off=dv.getUint32(eo+16,true),td=new TextDecoder("utf-8"),jobs=[];
+ for(i=0;i<n;i++){
+  if(dv.getUint32(off,true)!==0x02014b50){break;}
+  var meth=dv.getUint16(off+10,true),cs=dv.getUint32(off+20,true),nl=dv.getUint16(off+28,true),xl=dv.getUint16(off+30,true),cl=dv.getUint16(off+32,true),lo=dv.getUint32(off+42,true);
+  var name=td.decode(u8.subarray(off+46,off+46+nl));off+=46+nl+xl+cl;
+  if(!/\.(csv|json)$/i.test(name)){continue;}
+  var ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),raw=u8.slice(ds,ds+cs);
+  jobs.push((meth===0?Promise.resolve(raw.buffer):meth===8?inflate(raw):Promise.resolve(null)).then(function(nm){return function(b){return b?{name:nm,text:td.decode(new Uint8Array(b))}:null;};}(name)));}
+ return Promise.all(jobs).then(function(l){return l.filter(Boolean);});}
+function parseText(name,text){
+ if(/\.json$/i.test(name)||/^\s*\{/.test(text)){var j;try{j=JSON.parse(text);}catch(e){return {places:[]};}
+  if(j&&j.app==="meine-orte"){return {backup:j};}
+  return {places:fromGeo(j)};}
+ return {places:fromCSV(text)};}
+function readFile(f){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result);};r.onerror=function(){rej(new Error("lesen"));};r.readAsArrayBuffer(f);});}
+function importFile(f){
+ msg="Datei wird gelesen …";render();
+ readFile(f).then(function(buf){
+  var u8=new Uint8Array(buf);
+  if(u8[0]===0x50&&u8[1]===0x4b){
+   if(typeof DecompressionStream==="undefined"){throw new Error("altzip");}
+   return unzip(buf);}
+  return [{name:f.name,text:new TextDecoder("utf-8").decode(u8)}];
+ }).then(function(files){
+  if(!files.length){throw new Error("leer");}
+  var found=[],backups=[];
+  files.forEach(function(x){var r=parseText(x.name,x.text);if(r.backup){backups.push(r.backup);}else{found=found.concat(r.places);}});
+  var ids={},names={},neu=0,da=0,ed=0;
+  data.places.forEach(function(p){ids[p.id]=1;names[p.n.toLowerCase()]=1;});
+  backups.forEach(function(b){(b.places||[]).forEach(function(p){if(!p||!p.id||!p.n||!p.u){return;}if(ids[p.id]){da++;return;}ids[p.id]=1;names[p.n.toLowerCase()]=1;data.places.push(p);neu++;});
+   var e=b.edits||{};Object.keys(e).forEach(function(k){if(ids[k]&&e[k]&&typeof e[k]==="object"){data.edits[k]=e[k];ed++;}});});
+  found.forEach(function(p){if(ids[p.id]||(p.star&&names[p.n.toLowerCase()])){da++;return;}
+   delete p.star;ids[p.id]=1;names[p.n.toLowerCase()]=1;data.places.push(p);neu++;});
+  persist();
+  if(!backups.length&&!found.length){msg="In dieser Datei stehen keine Orte. Google liefert manchmal zwei ZIP-Dateien: bitte die mit „-1-“ im Namen wählen.";}
+  else if(!neu&&!ed){msg="Nichts Neues: alle "+da+" Orte der Datei sind schon in der App.";}
+  else{msg=neu+(neu===1?" neuer Ort":" neue Orte")+" eingebaut, "+da+" waren schon da."+(ed?" "+ed+" Bearbeitungen aus der Sicherung übernommen.":"")+(found.length&&neu?" Die neuen findest du im Reiter „Orte“ über den Filter „Kategorie prüfen“.":"");}
+  render();
+ }).catch(function(e){var c=e&&e.message;
+  msg=c==="altzip"?"Dieses Gerät kann ZIP-Dateien nicht selbst öffnen. Bitte die ZIP in „Dateien“ antippen (das entpackt sie) und dann die Datei „Favoriten.csv“ oder „Favorite places.csv“ aus dem Ordner „Gespeichert“ wählen.":c==="leer"||c==="keinzip"?"In dieser Datei stehen keine Orte. Google liefert manchmal zwei ZIP-Dateien: bitte die mit „-1-“ im Namen wählen.":"Die Datei ließ sich nicht lesen. Bitte die Takeout-ZIP, eine CSV-Datei daraus oder eine Sicherung wählen.";
+  render();});}
+
+/* ---------- Sicherung ---------- */
+function backup(){
+ var d=new Date(),ds=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+ var name="Meine-Orte-Sicherung-"+ds+".json",txt=JSON.stringify({app:"meine-orte",version:1,stand:d.toISOString(),places:data.places,edits:data.edits});
+ var file=null;try{file=new File([txt],name,{type:"application/json"});}catch(e){}
+ if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
+  navigator.share({files:[file],title:name}).then(function(){msg="Sicherung weitergegeben: "+name;render();},function(err){if(!err||err.name!=="AbortError"){download(txt,name);}});
+  return;}
+ download(txt,name);}
+function download(txt,name){var url=URL.createObjectURL(new Blob([txt],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},4000);msg="Sicherung gespeichert: "+name+" (Ordner Downloads)";render();}
+
+/* ---------- Bedienung ---------- */
+document.addEventListener("click",function(ev){
+ var t=ev.target.closest("[data-tab],[data-ort],[data-act]");if(!t){return;}
+ if(t.dataset.tab){if(view.tab!==t.dataset.tab){view.tab=t.dataset.tab;msg="";render();window.scrollTo(0,0);}return;}
+ if(t.dataset.ort){view.ort=t.dataset.ort;render();return;}
+ var a=t.dataset.act;
+ if(a==="backup"){backup();return;}
+ var c=t.closest(".card");if(!c){return;}var p=byId(c.dataset.id);if(!p){return;}
+ if(a==="edit"){view.edit=view.edit===p.id?null:p.id;render();}
+ if(a==="ok"){setE(p,"ok",1);render();}});
+document.addEventListener("toggle",function(ev){var d=ev.target;if(d.tagName!=="DETAILS"||!d.dataset.key){return;}
+ if(view.q||view.flt!=="alle"){return;}
+ if(d.open){view.open[d.dataset.key]=1;}else{delete view.open[d.dataset.key];}saveView();},true);
+document.addEventListener("change",function(ev){var id=ev.target.id,p=view.edit?byId(view.edit):null;
+ if(id==="imp"){var f=ev.target.files&&ev.target.files[0];if(f){importFile(f);}ev.target.value="";return;}
+ if(id==="flt"){view.flt=ev.target.value;render();return;}
+ if(!p){return;}
+ if(id==="ed-cat"){var nv=ev.target.value;setE(p,"c",nv===p.c?"":nv);if(p.q){setE(p,"ok",1);}view.open[(ortOfP(p))+"|"+nv]=1;render();}
+ if(id==="ed-ort"){setE(p,"o",ev.target.value===p.o?"":ev.target.value);view.open[ev.target.value+"|"+cat(p)]=1;render();}
+ if(id==="ed-v"){setE(p,"v",ev.target.checked?1:0);render();}
+ if(id==="ed-r"){setE(p,"r",+ev.target.value);render();}});
+var tq=null;
+document.addEventListener("input",function(ev){var id=ev.target.id;
+ if(id==="q"){view.q=ev.target.value;clearTimeout(tq);tq=setTimeout(function(){render(true);},250);}
+ if(id==="ed-n"){var p=view.edit?byId(view.edit):null;if(p){var val=ev.target.value;if(val===(p.g||"")){var e=data.edits[p.id];if(e){delete e.n;if(!Object.keys(e).length){delete data.edits[p.id];}}persist();}else{var e2=data.edits[p.id]||{};e2.n=val;data.edits[p.id]=e2;persist();}}}});
+if(!data.places.length){view.tab="anleitung";}
+render();
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
+})();
+</script>
+</body>
+</html>
